@@ -59,6 +59,17 @@ headers package. The Armbian `armbianEnv.txt` instructions follow Armbian's
   unbalanced picture — at 60 fps.
 - An initramfs built by `initramfs-tools` or `mkinitcpio` (see step 3 for why).
 
+### Not supported: Radxa OS
+
+Radxa OS for the ROCK 5B (rsdk r6, 2026) ships a hopelessly old vendor kernel,
+**6.1.84 from rk-6.1-rkr4.1** (`linux-image-6.1.84-8-rk2410`), and there is no official
+way to a newer one: Radxa builds a 6.1.115 rk-6.1-rkr5.1 kernel (`rk2501`, from
+`radxa/kernel` `linux-6.1-stan-rkr5.1`) but publishes it only to the *test* apt suites
+of other SoCs (RK3399, RK3308), not to `rk3588-bookworm`. The rkr5.1 driver here does
+not compile against rkr4.1 (its `rk-camera-module.h` lacks `RKMODULE_GET_EXP_INFO`),
+so Radxa OS is not supported. It builds fine against `rk2501` if you install that by
+hand — you are on your own there.
+
 ## 2. Steps
 
 ### Armbian: the DKMS package
