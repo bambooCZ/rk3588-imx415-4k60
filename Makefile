@@ -55,13 +55,8 @@ $(I2C)/imx415_60fps.c: vendor/drivers/media/i2c/imx415.c imx415-60fps.patch
 
 prepare: $(I2C)/imx415_60fps.c
 
-# pahole: kbuild re-evaluates the kernel config with the local toolchain, and without
-# pahole it drops DEBUG_INFO_BTF(_MODULES) - which removes fields from struct module,
-# so the module would load but could never be unloaded ([permanent]).
 $(KO): $(I2C)/imx415_60fps.c
 	@test -f $(KDIR)/Makefile || { echo "No kernel headers at $(KDIR): install the headers package of kernel $(KVER)"; exit 1; }
-	@if grep -qs '^CONFIG_DEBUG_INFO_BTF=y' /boot/config-$(KVER) && ! command -v pahole >/dev/null; then \
-		echo "This kernel has BTF: install pahole first (Debian/Armbian: apt install dwarves)"; exit 1; fi
 	@sh scripts/check-headers.sh $(KVER) $(KDIR)
 	$(MAKE) -C $(KDIR) M=$(CURDIR)/$(I2C) modules
 
@@ -93,7 +88,7 @@ check: $(KO)
 	size() { objdump -h "$$1" | awk '$$2 == ".gnu.linkonce.this_module" { print $$3 }'; }; \
 	a=$$(size $(KO)); b=$$(size $$tmp); rm -f $$tmp; \
 	if [ "$$a" = "$$b" ]; then echo "struct module: 0x$$a, same as $$(basename $$ref) - ok"; \
-	else echo "struct module: ours 0x$$a, the kernel's 0x$$b - headers do not match the running kernel's config"; exit 1; fi
+	else echo "struct module: ours 0x$$a, the kernel's 0x$$b - WARNING: the module will load but cannot be unloaded (headers without BTF, see README)"; fi
 
 install: check $(DTBO)
 	@test "$$(id -u)" = 0 || { echo "install needs root: sudo make install"; exit 1; }

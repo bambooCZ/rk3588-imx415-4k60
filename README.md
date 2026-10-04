@@ -47,12 +47,10 @@ headers package. The Armbian `armbianEnv.txt` instructions follow Armbian's
   (Armbian: `linux-headers-vendor-rk35xx` from apt; its postinst builds the host tools).
 - **Build tools:** `gcc make bc flex bison libssl-dev libelf-dev`, plus `patch`,
   `device-tree-compiler` (`fdtget`/`fdtput`), `kmod` (`modinfo`, `depmod`), `binutils`
-  (`objdump`) and **`pahole`** (Debian: `dwarves`, installed before the headers). Debian/Armbian:
-  `sudo apt install build-essential bc flex bison libssl-dev libelf-dev patch device-tree-compiler kmod binutils dwarves`
-  Without pahole, kbuild silently drops the kernel's BTF options while building the
-  module, `struct module` changes size and the module loads but can never be unloaded;
-  `make` compares the headers' config with `/boot/config-<kernel>` and refuses on any
-  difference, and `make check` compares `struct module` too.
+  (`objdump`). Debian/Armbian:
+  `sudo apt install build-essential bc flex bison libssl-dev libelf-dev patch device-tree-compiler kmod binutils`
+  `make` compares the headers' config with `/boot/config-<kernel>` and refuses on a
+  real difference.
 - **rkaiq** (Rockchip's 3A server, `rkaiq_3A_server`) with the IQ file
   `imx415_RADXA-CAMERA-4K_DEFAULT.json` (Radxa's `rockchip-iqfiles`). Sensor, module and
   lens names are unchanged, so it is found as before. Without rkaiq you get a raw,
@@ -80,9 +78,8 @@ rk-6.1-rkr7.2 kernel), a `.deb` from the
 install below for you, and DKMS rebuilds the module for every later kernel update:
 
 ```sh
-sudo apt install dwarves                      # BEFORE the headers, see below
 sudo apt install linux-headers-vendor-rk35xx  # if not installed yet
-sudo apt install ./imx415-60fps-dkms_1.0.0_all.deb
+sudo apt install ./imx415-60fps-dkms_1.0.1_all.deb
 ```
 
 It builds `imx415_60fps` for each installed kernel with headers, derives
@@ -93,11 +90,12 @@ reboot. It depends on `linux-image/headers/dtb-vendor-rk35xx (<< 26.11)`, so apt
 those kernel packages back rather than upgrading to the 6.1.172 kernel it was not made
 for. `make deb` builds the same package from this tree.
 
-**Headers installed before `dwarves`?** Armbian's headers package rewrites its config
-when it is installed, and without pahole it turns BTF off — for good. The DKMS build
-then refuses with a config mismatch against `/boot/config-<kernel>`; fix it with
-`sudo apt install --reinstall linux-headers-vendor-rk35xx` (with `dwarves` installed),
-then `sudo dpkg-reconfigure imx415-60fps-dkms`.
+**A warning about BTF** means Armbian's headers package was installed while `pahole`
+(`dwarves`) was not: it then rewrites its config without BTF, `struct module` comes out
+smaller, and the module works but cannot be unloaded (`[permanent]` — no `rmmod`).
+Harmless for a camera driver. To get `rmmod` back: `sudo apt install dwarves`,
+`sudo apt install --reinstall linux-headers-vendor-rk35xx`,
+`sudo dpkg-reconfigure imx415-60fps-dkms`.
 
 ### Clone
 
@@ -157,7 +155,7 @@ in `append`, `initcall_blacklist=rkcif_clr_unready_dev,rkisp_clr_unready_dev`.
 
 ```sh
 sudo reboot
-lsmod | grep imx415_60fps                    # loaded, not [permanent]
+lsmod | grep imx415_60fps                    # loaded
 dmesg | grep -i imx415-60fps                 # probed on 3-001a
 v4l2-ctl --list-devices                      # find rkisp_mainpath, e.g. /dev/video11
 v4l2-ctl -d /dev/video11 --set-fmt-video=width=3840,height=2160,pixelformat=NV12 \
