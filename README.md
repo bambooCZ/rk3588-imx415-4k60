@@ -69,9 +69,10 @@ Verified on a ROCK 5B with the Radxa Camera 4K, Armbian's `vendor-rk35xx` kernel
   use, **1080p60 at 12 Mbit/s** with 0 lost, RTSP at 60.0 fps with no repeated stamps.
 
 The machine that runs it uses Arch Linux ARM with that Armbian kernel repackaged and
-extlinux; the build/install flow here was also run in an arm64 Debian with Armbian's
-headers package. The Armbian `armbianEnv.txt` instructions follow Armbian's
-`boot-rk35xx.cmd` but were not booted on an Armbian image — reports welcome.
+extlinux. The DKMS package installs on Armbian 26.8.3 (trixie, `vendor-rk35xx`
+6.1.115): module built and in the initramfs, overlay in `/boot/overlay-user`. Booting
+with the `armbianEnv.txt` settings on an Armbian image is not confirmed yet — reports
+welcome.
 
 ## 1. Requirements
 
