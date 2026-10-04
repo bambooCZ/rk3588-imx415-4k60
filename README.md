@@ -47,11 +47,12 @@ headers package. The Armbian `armbianEnv.txt` instructions follow Armbian's
   (Armbian: `linux-headers-vendor-rk35xx` from apt; its postinst builds the host tools).
 - **Build tools:** `gcc make bc flex bison libssl-dev libelf-dev`, plus `patch`,
   `device-tree-compiler` (`fdtget`/`fdtput`), `kmod` (`modinfo`, `depmod`), `binutils`
-  (`objdump`) and **`pahole`** (Debian: `dwarves`). Debian/Armbian:
+  (`objdump`) and **`pahole`** (Debian: `dwarves`, installed before the headers). Debian/Armbian:
   `sudo apt install build-essential bc flex bison libssl-dev libelf-dev patch device-tree-compiler kmod binutils dwarves`
   Without pahole, kbuild silently drops the kernel's BTF options while building the
   module, `struct module` changes size and the module loads but can never be unloaded;
-  `make` refuses to build without it and `make check` catches the mismatch.
+  `make` compares the headers' config with `/boot/config-<kernel>` and refuses on any
+  difference, and `make check` compares `struct module` too.
 - **rkaiq** (Rockchip's 3A server, `rkaiq_3A_server`) with the IQ file
   `imx415_RADXA-CAMERA-4K_DEFAULT.json` (Radxa's `rockchip-iqfiles`). Sensor, module and
   lens names are unchanged, so it is found as before. Without rkaiq you get a raw,
@@ -59,6 +60,33 @@ headers package. The Armbian `armbianEnv.txt` instructions follow Armbian's
 - An initramfs built by `initramfs-tools` or `mkinitcpio` (see step 3 for why).
 
 ## 2. Steps
+
+### Armbian: the DKMS package
+
+For Armbian's `vendor-rk35xx` kernels before Armbian 26.11 (i.e. before the
+rk-6.1-rkr7.2 kernel), a `.deb` from the
+[releases](https://github.com/bambooCZ/rk3588-imx415-4k60/releases) does the build and
+install below for you, and DKMS rebuilds the module for every later kernel update:
+
+```sh
+sudo apt install dwarves                      # BEFORE the headers, see below
+sudo apt install linux-headers-vendor-rk35xx  # if not installed yet
+sudo apt install ./imx415-60fps-dkms_1.0.0_all.deb
+```
+
+It builds `imx415_60fps` for each installed kernel with headers, derives
+`/boot/overlay-user/rock-5b-radxa-camera-4k-60fps.dtbo` from that kernel's stock overlay
+(`imx415-60fps-overlay` redoes it by hand) and adds the module to the initramfs
+(`/usr/share/initramfs-tools/modules.d/imx415-60fps`). Then do **Configure** below and
+reboot. It depends on `linux-image/headers/dtb-vendor-rk35xx (<< 26.11)`, so apt holds
+those kernel packages back rather than upgrading to the 6.1.172 kernel it was not made
+for. `make deb` builds the same package from this tree.
+
+**Headers installed before `dwarves`?** Armbian's headers package rewrites its config
+when it is installed, and without pahole it turns BTF off — for good. The DKMS build
+then refuses with a config mismatch against `/boot/config-<kernel>`; fix it with
+`sudo apt install --reinstall linux-headers-vendor-rk35xx` (with `dwarves` installed),
+then `sudo dpkg-reconfigure imx415-60fps-dkms`.
 
 ### Clone
 
@@ -130,6 +158,24 @@ grep mipi-csi2 /proc/interrupts             # CSI-2 error IRQs: must not grow
 Count CSI-2 errors from `/proc/interrupts`, not from `dmesg` — the ring buffer caps
 the printks.
 
+### Switching between 30 and 60 fps
+
+The overlay is the switch. With `rock-5b-radxa-camera-4k-60fps` the camera binds to
+`imx415_60fps` and streams 4K60 by default; with the stock `rock-5b-radxa-camera-4k`
+it binds to the built-in driver and you are back on its 30 fps modes. Everything else
+can stay installed either way — the module, its initramfs entry and the
+`initcall_blacklist` are harmless when the other overlay is active — so switching is
+one line in `armbianEnv.txt` (`user_overlays=` vs `overlays=`) or `extlinux.conf`
+(`fdtoverlays`) plus a reboot. Never load both overlays at once.
+
+**The overlay is the only practical switch.** The rkisp video node ignores the
+frame rate in the caps and delivers whatever the sensor sends: ask GStreamer for
+`framerate=30/1` and you still get ~60 fps — and an encoder that budgets bits per
+frame from the caps then produces twice the bitrate you set. The driver does have a
+`vblank` control, but setting it by hand does not survive a stream start: rkaiq
+switches the sensor mode then and the vendor driver resets vblank on every mode
+change. So configure your pipeline for the rate the sensor actually runs at.
+
 **Rollback:** put the stock overlay back in your boot configuration; the built-in
 driver takes the camera again. The `initcall_blacklist` is harmless to it and the
 unbound module does nothing. `sudo make uninstall` removes the module, the overlay and
@@ -140,8 +186,7 @@ the initramfs entry.
 ### The mode
 
 3864×2192, 10-bit, linear, 60 fps, 4 lanes at **1485 Mbps**, first in the 4-lane mode
-table (so it is the default at probe and the best fit for 3864×2192). Lower frame
-rates still come from `vblank` (VMAX), as with every other mode. The registers are the
+table (so it is the default at probe and the best fit for 3864×2192). The registers are the
 driver's 4K@30 linear table (891 Mbps) with:
 
 | Register | 4K@30 | 4K@60 | Source |

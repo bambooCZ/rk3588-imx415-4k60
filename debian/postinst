@@ -1,0 +1,40 @@
+#!/bin/sh
+set -e
+NAME=imx415-60fps
+VERSION=@VERSION@
+
+if [ "$1" = configure ]; then
+    dkms status -m "$NAME" -v "$VERSION" | grep -q . || dkms add -m "$NAME" -v "$VERSION"
+    built=
+    for build in /lib/modules/*/build; do
+        [ -e "$build/Makefile" ] || continue
+        kver=$(basename "$(dirname "$build")")
+        if dkms install -m "$NAME" -v "$VERSION" -k "$kver"; then
+            built="$built $kver"
+        else
+            echo "$NAME: DKMS build for $kver failed:" >&2
+            sh "/usr/src/$NAME-$VERSION/scripts/check-headers.sh" "$kver" "$build" >&2 || true
+        fi
+    done
+    overlay=
+    for kver in $built; do
+        imx415-60fps-overlay "$kver" && { overlay=1; break; } || true
+    done
+    [ -n "$overlay" ] || echo "$NAME: overlay not derived; run imx415-60fps-overlay once the kernel's dtb package is installed" >&2
+    for kver in $built; do
+        update-initramfs -u -k "$kver" || echo "$NAME: update-initramfs for $kver failed" >&2
+    done
+    if [ -z "$built" ]; then
+        echo "$NAME: nothing was built. Fix the cause above, then: sudo dpkg-reconfigure $NAME-dkms" >&2
+        exit 0
+    fi
+    cat <<'HINT'
+
+imx415-60fps: now edit /boot/armbianEnv.txt and reboot:
+    user_overlays=rock-5b-radxa-camera-4k-60fps
+    extraargs=initcall_blacklist=rkcif_clr_unready_dev,rkisp_clr_unready_dev
+  and REMOVE the stock camera overlay (radxa-camera-4k) from overlays= - never both.
+  Append to existing user_overlays=/extraargs= values, space separated.
+HINT
+fi
+exit 0

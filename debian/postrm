@@ -1,0 +1,9 @@
+#!/bin/sh
+set -e
+case "$1" in
+    remove|purge)
+        rm -f /boot/overlay-user/rock-5b-radxa-camera-4k-60fps.dtbo
+        update-initramfs -u -k all || true
+        echo "imx415-60fps: removed; put the stock camera overlay back in /boot/armbianEnv.txt" ;;
+esac
+exit 0

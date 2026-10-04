@@ -1,0 +1,24 @@
+#!/bin/sh
+# Derive the imx415-60fps overlay from the stock Radxa Camera 4K overlay of a kernel:
+# only the sensor node's compatible (and the metadata title/description) change.
+#   imx415-60fps-overlay [KVER] [DEST]
+set -e
+KVER=${1:-$(uname -r)}
+DEST=${2:-/boot/overlay-user/rock-5b-radxa-camera-4k-60fps.dtbo}
+NODE=/fragment@0/__overlay__/imx415@1a
+SRC=
+for f in /boot/dtb-$KVER/rockchip/overlay/rock-5b-radxa-camera-4k.dtbo \
+         /usr/lib/linux-image-$KVER/rockchip/overlay/rock-5b-radxa-camera-4k.dtbo \
+         /boot/dtb/rockchip/overlay/rock-5b-radxa-camera-4k.dtbo; do
+    [ -f "$f" ] && { SRC=$f; break; }
+done
+[ -n "$SRC" ] || { echo "imx415-60fps-overlay: no rock-5b-radxa-camera-4k.dtbo for $KVER" >&2; exit 1; }
+tmp=$(mktemp)
+trap 'rm -f "$tmp"' EXIT
+cp "$SRC" "$tmp"
+[ "$(fdtget "$tmp" "$NODE" compatible)" = "sony,imx415" ] || { echo "imx415-60fps-overlay: $SRC: $NODE is not sony,imx415" >&2; exit 1; }
+fdtput -t s "$tmp" "$NODE" compatible pitwall,imx415-60fps
+fdtput -t s "$tmp" /metadata title 'Enable Radxa Camera 4K (imx415-60fps driver)'
+fdtput -t s "$tmp" /metadata description 'Enable Radxa Camera 4K, bound to the out-of-tree imx415-60fps driver instead of the built-in imx415.'
+install -Dm644 "$tmp" "$DEST"
+echo "imx415-60fps-overlay: $DEST (from $SRC)"

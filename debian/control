@@ -1,0 +1,17 @@
+Package: imx415-60fps-dkms
+Version: @VERSION@
+Architecture: all
+Section: kernel
+Priority: optional
+Maintainer: Miloslav Mrvík <miloslav.mrvik@gmail.com>
+Homepage: https://github.com/bambooCZ/rk3588-imx415-4k60
+Depends: dkms, dwarves, device-tree-compiler, initramfs-tools, linux-image-vendor-rk35xx (<< 26.11), linux-headers-vendor-rk35xx (<< 26.11), linux-dtb-vendor-rk35xx (<< 26.11)
+Description: IMX415 (Radxa Camera 4K) at 4K@60 for the RK3588 vendor kernel (DKMS)
+ The Rockchip vendor imx415 driver with a 4-lane linear 3864x2192 60 fps mode,
+ built by DKMS as the out-of-tree module imx415_60fps for every installed
+ Armbian vendor-rk35xx kernel, plus the Radxa Camera 4K overlay rebound to it
+ (/boot/overlay-user/rock-5b-radxa-camera-4k-60fps.dtbo) and the module added
+ to the initramfs.
+ .
+ For the vendor kernels before Armbian 26.11 (before rk-6.1-rkr7.2). The boot
+ configuration (user_overlays, extraargs) is left to you: see the README.

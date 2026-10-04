@@ -7,6 +7,7 @@
 #   sudo make install    install module + overlay, add the module to the initramfs
 #   make config-hints    print the boot configuration lines to add by hand
 #   sudo make uninstall  undo `make install` (boot configuration is yours to revert)
+#   make deb             the DKMS .deb for Armbian (needs dpkg-deb)
 
 KVER      ?= $(shell uname -r)
 KDIR      ?= /lib/modules/$(KVER)/build
@@ -35,7 +36,7 @@ else
 OVERLAY_DIR ?= $(patsubst %/,%,$(dir $(DTBO_SRC)))
 endif
 
-.PHONY: all prepare module overlay check install uninstall config-hints clean
+.PHONY: all prepare module overlay check install uninstall config-hints clean deb
 
 all: module overlay
 
@@ -59,8 +60,9 @@ prepare: $(I2C)/imx415_60fps.c
 # so the module would load but could never be unloaded ([permanent]).
 $(KO): $(I2C)/imx415_60fps.c
 	@test -f $(KDIR)/Makefile || { echo "No kernel headers at $(KDIR): install the headers package of kernel $(KVER)"; exit 1; }
-	@if grep -q '^CONFIG_DEBUG_INFO_BTF=y' $(KDIR)/.config && ! command -v pahole >/dev/null; then \
+	@if grep -qs '^CONFIG_DEBUG_INFO_BTF=y' /boot/config-$(KVER) && ! command -v pahole >/dev/null; then \
 		echo "This kernel has BTF: install pahole first (Debian/Armbian: apt install dwarves)"; exit 1; fi
+	@sh scripts/check-headers.sh $(KVER) $(KDIR)
 	$(MAKE) -C $(KDIR) M=$(CURDIR)/$(I2C) modules
 
 $(DTBO):
@@ -138,3 +140,22 @@ config-hints:
 
 clean:
 	rm -rf $(BUILD)
+
+DEB_VERSION := $(shell sed -n 's/^PACKAGE_VERSION="\(.*\)"/\1/p' dkms.conf)
+DEB_ROOT    := $(BUILD)/deb
+DEB_SRC     := $(DEB_ROOT)/usr/src/imx415-60fps-$(DEB_VERSION)
+DEB         := $(BUILD)/imx415-60fps-dkms_$(DEB_VERSION)_all.deb
+
+deb:
+	rm -rf $(DEB_ROOT)
+	install -d $(DEB_SRC) $(DEB_ROOT)/DEBIAN
+	cp -r Makefile imx415-60fps.patch dkms.conf vendor scripts $(DEB_SRC)/
+	install -Dm755 debian/imx415-60fps-overlay $(DEB_ROOT)/usr/sbin/imx415-60fps-overlay
+	install -Dm644 debian/initramfs-modules $(DEB_ROOT)/usr/share/initramfs-tools/modules.d/imx415-60fps
+	install -Dm644 LICENSE $(DEB_ROOT)/usr/share/doc/imx415-60fps-dkms/copyright
+	install -Dm644 README.md $(DEB_ROOT)/usr/share/doc/imx415-60fps-dkms/README.md
+	for f in control postinst prerm postrm; do \
+		sed 's/@VERSION@/$(DEB_VERSION)/' debian/$$f > $(DEB_ROOT)/DEBIAN/$$f; done
+	chmod 755 $(DEB_ROOT)/DEBIAN/postinst $(DEB_ROOT)/DEBIAN/prerm $(DEB_ROOT)/DEBIAN/postrm
+	dpkg-deb --root-owner-group -Zxz --build $(DEB_ROOT) $(DEB)
+	@echo "deb: $(DEB)"
