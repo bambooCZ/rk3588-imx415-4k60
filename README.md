@@ -5,21 +5,25 @@ no kernel rebuild.
 
 ## Installation (Armbian)
 
-```sh
-wget "https://github.com/bambooCZ/rk3588-imx415-4k60/releases/latest/download/imx415-60fps-dkms.deb"
-sudo apt update
-sudo apt install ./imx415-60fps-dkms.deb
-```
+1. Install the package:
 
-Then in `/boot/armbianEnv.txt` (append to existing values) and reboot:
+   ```sh
+   wget "https://github.com/bambooCZ/rk3588-imx415-4k60/releases/latest/download/imx415-60fps-dkms.deb"
+   sudo apt update
+   sudo apt install ./imx415-60fps-dkms.deb
+   ```
 
-```
-user_overlays=rock-5b-radxa-camera-4k-60fps
-extraargs=initcall_blacklist=rkcif_clr_unready_dev,rkisp_clr_unready_dev
-```
+2. Edit `/boot/armbianEnv.txt`:
+   - **remove** `radxa-camera-4k` from the `overlays=` line, if it is there;
+   - **add** `rock-5b-radxa-camera-4k-60fps` to the `user_overlays=` line
+     (create the line if there is none; values are space separated);
+   - **add** `initcall_blacklist=rkcif_clr_unready_dev,rkisp_clr_unready_dev` to the
+     `extraargs=` line (create the line if there is none).
 
-and remove `radxa-camera-4k` from `overlays=`. Needs Armbian's `vendor-rk35xx` kernel
-before Armbian 26.11. Other systems: [build it yourself](#2-steps).
+3. Reboot.
+
+Needs Armbian's `vendor-rk35xx` kernel before Armbian 26.11. Other systems:
+[build it yourself](#2-steps).
 
 ---
 
