@@ -169,9 +169,10 @@ make          # patches the vendored driver, builds imx415_60fps.ko, derives the
 make check    # vermagic, binding, and struct module size vs. a module of your kernel
 ```
 
-`make check` must pass. If it reports a different `struct module` size, your headers
-do not match the running kernel's configuration (the module would load and then be
-impossible to unload); fix the headers, do not force it.
+`make check` must pass, and `make install` runs it first. A different `struct module`
+size passes only as a warning when the sole cause is headers without BTF (see above:
+the module works, no `rmmod`); any other mismatch fails — your headers do not match
+the running kernel, fix them rather than forcing the install.
 
 Variables: `KVER` (default `uname -r`), `KDIR` (default `/lib/modules/$KVER/build`),
 `DTBO_SRC` (the stock overlay, found automatically under `/boot/dtb*`, `/boot/dtbs/*`

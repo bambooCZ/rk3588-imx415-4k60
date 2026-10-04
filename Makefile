@@ -57,7 +57,7 @@ prepare: $(I2C)/imx415_60fps.c
 
 $(KO): $(I2C)/imx415_60fps.c
 	@test -f $(KDIR)/Makefile || { echo "No kernel headers at $(KDIR): install the headers package of kernel $(KVER)"; exit 1; }
-	@sh scripts/check-headers.sh $(KVER) $(KDIR)
+	@sh scripts/check-headers.sh $(KVER) $(KDIR); rc=$$?; [ $$rc = 0 ] || [ $$rc = 3 ]
 	$(MAKE) -C $(KDIR) M=$(CURDIR)/$(I2C) modules
 
 $(DTBO):
@@ -71,9 +71,10 @@ $(DTBO):
 	@echo "overlay: $(DTBO) (from $(DTBO_SRC))"
 
 # vermagic catches a different kernel; it does not catch a config drift between the
-# headers and the running kernel, which shows as a different struct module size (the
-# module then loads but cannot be unloaded, [permanent]). Compare with a module of the
-# running kernel itself.
+# headers and the running kernel, which shows as a different struct module size.
+# Compare with a module of the running kernel itself. A mismatch passes (with a
+# warning) only when check-headers.sh explains it as headers without BTF, which just
+# makes the module [permanent]; any other mismatch fails, and with it `make install`.
 check: $(KO)
 	@modinfo -F vermagic $(KO) | grep -q "^$(KVER) " \
 		&& echo "vermagic: $(KVER) - ok" \
@@ -87,8 +88,10 @@ check: $(KO)
 		*) cp "$$ref" $$tmp ;; esac; \
 	size() { objdump -h "$$1" | awk '$$2 == ".gnu.linkonce.this_module" { print $$3 }'; }; \
 	a=$$(size $(KO)); b=$$(size $$tmp); rm -f $$tmp; \
-	if [ "$$a" = "$$b" ]; then echo "struct module: 0x$$a, same as $$(basename $$ref) - ok"; \
-	else echo "struct module: ours 0x$$a, the kernel's 0x$$b - WARNING: the module will load but cannot be unloaded (headers without BTF, see README)"; fi
+	if [ "$$a" = "$$b" ]; then echo "struct module: 0x$$a, same as $$(basename $$ref) - ok"; exit 0; fi; \
+	sh scripts/check-headers.sh $(KVER) $(KDIR) >/dev/null 2>&1; rc=$$?; \
+	if [ $$rc = 3 ]; then echo "struct module: ours 0x$$a, the kernel's 0x$$b - WARNING: headers without BTF, the module will load but cannot be unloaded"; \
+	else echo "struct module: ours 0x$$a, the kernel's 0x$$b - the headers do not match the running kernel; not installing"; exit 1; fi
 
 install: check $(DTBO)
 	@test "$$(id -u)" = 0 || { echo "install needs root: sudo make install"; exit 1; }

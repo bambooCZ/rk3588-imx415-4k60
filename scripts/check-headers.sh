@@ -8,6 +8,8 @@
 # config on install). That shrinks struct module, and the kernel then cannot find the
 # module's exit function: it loads and works, but is [permanent] (no rmmod).
 #   check-headers.sh KVER KDIR
+# Exit status: 0 = matches (or no /boot/config to compare), 3 = only BTF differs
+# (tolerated, warned), 1 = anything else.
 KVER=$1
 KDIR=$2
 REF=/boot/config-$KVER
@@ -38,3 +40,4 @@ fi
 echo "check-headers: WARNING: the headers have no BTF (set up without pahole), the kernel has."
 echo "  The module will work but cannot be unloaded ([permanent]). Harmless for a camera"
 echo "  driver; to get rmmod back: apt install dwarves, reinstall the headers package, rebuild."
+exit 3
