@@ -1,5 +1,28 @@
 # IMX415 at 4K@60 on RK3588 (Rockchip BSP kernel)
 
+Radxa Camera 4K (Sony IMX415) at a real 4K@60 on the ROCK 5B — Armbian vendor kernel,
+no kernel rebuild.
+
+## Installation (Armbian)
+
+```sh
+wget "https://github.com/bambooCZ/rk3588-imx415-4k60/releases/latest/download/imx415-60fps-dkms_latest_all.deb"
+sudo apt update
+sudo apt install ./imx415-60fps-dkms_latest_all.deb
+```
+
+Then in `/boot/armbianEnv.txt` (append to existing values) and reboot:
+
+```
+user_overlays=rock-5b-radxa-camera-4k-60fps
+extraargs=initcall_blacklist=rkcif_clr_unready_dev,rkisp_clr_unready_dev
+```
+
+and remove `radxa-camera-4k` from `overlays=`. Needs Armbian's `vendor-rk35xx` kernel
+before Armbian 26.11. Other systems: [build it yourself](#2-steps).
+
+---
+
 The Sony IMX415 ("Radxa Camera 4K") on a Radxa ROCK 5B, **3864×2192 at a real
 60 fps** — 60 distinct frames per second through rkcif → rkisp → rkaiq, no CSI-2
 errors, no duplicated timestamps — on the stock Rockchip BSP ("vendor") kernel,
@@ -79,7 +102,7 @@ install below for you, and DKMS rebuilds the module for every later kernel updat
 
 ```sh
 sudo apt install linux-headers-vendor-rk35xx  # if not installed yet
-sudo apt install ./imx415-60fps-dkms_1.0.1_all.deb
+sudo apt install ./imx415-60fps-dkms_latest_all.deb
 ```
 
 It builds `imx415_60fps` for each installed kernel with headers, derives
