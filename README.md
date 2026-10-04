@@ -3,7 +3,7 @@
 Radxa Camera 4K (Sony IMX415) at a real 4K@60 on the ROCK 5B — Armbian vendor kernel,
 no kernel rebuild.
 
-## Installation (Armbian)
+## Quick start (Armbian)
 
 1. Install the package:
 
