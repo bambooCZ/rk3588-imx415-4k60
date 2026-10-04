@@ -153,5 +153,5 @@ deb:
 		sed 's/@VERSION@/$(DEB_VERSION)/' debian/$$f > $(DEB_ROOT)/DEBIAN/$$f; done
 	chmod 755 $(DEB_ROOT)/DEBIAN/postinst $(DEB_ROOT)/DEBIAN/prerm $(DEB_ROOT)/DEBIAN/postrm
 	dpkg-deb --root-owner-group -Zxz --build $(DEB_ROOT) $(DEB)
-	cp $(DEB) $(BUILD)/imx415-60fps-dkms_latest_all.deb
-	@echo "deb: $(DEB) (release asset: $(BUILD)/imx415-60fps-dkms_latest_all.deb)"
+	cp $(DEB) $(BUILD)/imx415-60fps-dkms.deb
+	@echo "deb: $(DEB) (release asset: $(BUILD)/imx415-60fps-dkms.deb)"

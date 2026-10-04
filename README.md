@@ -6,9 +6,9 @@ no kernel rebuild.
 ## Installation (Armbian)
 
 ```sh
-wget "https://github.com/bambooCZ/rk3588-imx415-4k60/releases/latest/download/imx415-60fps-dkms_latest_all.deb"
+wget "https://github.com/bambooCZ/rk3588-imx415-4k60/releases/latest/download/imx415-60fps-dkms.deb"
 sudo apt update
-sudo apt install ./imx415-60fps-dkms_latest_all.deb
+sudo apt install ./imx415-60fps-dkms.deb
 ```
 
 Then in `/boot/armbianEnv.txt` (append to existing values) and reboot:
@@ -102,7 +102,7 @@ install below for you, and DKMS rebuilds the module for every later kernel updat
 
 ```sh
 sudo apt install linux-headers-vendor-rk35xx  # if not installed yet
-sudo apt install ./imx415-60fps-dkms_latest_all.deb
+sudo apt install ./imx415-60fps-dkms.deb
 ```
 
 It builds `imx415_60fps` for each installed kernel with headers, derives
