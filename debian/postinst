@@ -33,7 +33,7 @@ if [ "$1" = configure ]; then
 imx415-60fps: now edit /boot/armbianEnv.txt and reboot:
     user_overlays=rock-5b-radxa-camera-4k-60fps
     extraargs=initcall_blacklist=rkcif_clr_unready_dev,rkisp_clr_unready_dev
-  and REMOVE the stock camera overlay (radxa-camera-4k) from overlays= - never both.
+  and REMOVE the stock camera overlay (rock-5b-radxa-camera-4k) from overlays= - never both.
   Append to existing user_overlays=/extraargs= values, space separated.
 HINT
 fi

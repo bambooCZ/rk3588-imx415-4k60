@@ -14,7 +14,8 @@ no kernel rebuild.
    ```
 
 2. Edit `/boot/armbianEnv.txt`:
-   - **remove** `radxa-camera-4k` from the `overlays=` line, if it is there;
+   - **remove** `rock-5b-radxa-camera-4k` (the stock camera overlay) from the `overlays=`
+     line, if it is there;
    - **add** `rock-5b-radxa-camera-4k-60fps` to the `user_overlays=` line
      (create the line if there is none; values are space separated);
    - **add** `initcall_blacklist=rkcif_clr_unready_dev,rkisp_clr_unready_dev` to the
@@ -38,6 +39,21 @@ no kernel rebuild.
 
 Needs Armbian's `vendor-rk35xx` kernel before Armbian 26.11. Other systems:
 [build it yourself](#2-steps).
+
+## Switching between 30 and 60 fps
+
+The overlay decides, and nothing else does. Change it in `/boot/armbianEnv.txt` and
+reboot; the package can stay installed either way:
+
+- **60 fps:** `user_overlays=rock-5b-radxa-camera-4k-60fps`, and `rock-5b-radxa-camera-4k`
+  not in `overlays=`;
+- **30 fps** (the stock driver): `overlays=rock-5b-radxa-camera-4k`, and
+  `rock-5b-radxa-camera-4k-60fps` not in `user_overlays=`.
+
+Never both. Your application cannot pick the rate: the ISP delivers whatever the sensor
+sends, so asking GStreamer for `framerate=30/1` on the 60 fps overlay still gives
+60 fps — and an encoder that budgets bits per frame from the caps then produces twice
+the bitrate you set. Configure your pipeline for the rate the overlay gives.
 
 ---
 
@@ -208,24 +224,6 @@ grep mipi-csi2 /proc/interrupts             # CSI-2 error IRQs: must not grow
 
 Count CSI-2 errors from `/proc/interrupts`, not from `dmesg` — the ring buffer caps
 the printks.
-
-### Switching between 30 and 60 fps
-
-The overlay is the switch. With `rock-5b-radxa-camera-4k-60fps` the camera binds to
-`imx415_60fps` and streams 4K60 by default; with the stock `rock-5b-radxa-camera-4k`
-it binds to the built-in driver and you are back on its 30 fps modes. Everything else
-can stay installed either way — the module, its initramfs entry and the
-`initcall_blacklist` are harmless when the other overlay is active — so switching is
-one line in `armbianEnv.txt` (`user_overlays=` vs `overlays=`) or `extlinux.conf`
-(`fdtoverlays`) plus a reboot. Never load both overlays at once.
-
-**The overlay is the only practical switch.** The rkisp video node ignores the
-frame rate in the caps and delivers whatever the sensor sends: ask GStreamer for
-`framerate=30/1` and you still get ~60 fps — and an encoder that budgets bits per
-frame from the caps then produces twice the bitrate you set. The driver does have a
-`vblank` control, but setting it by hand does not survive a stream start: rkaiq
-switches the sensor mode then and the vendor driver resets vblank on every mode
-change. So configure your pipeline for the rate the sensor actually runs at.
 
 **Rollback:** put the stock overlay back in your boot configuration; the built-in
 driver takes the camera again. The `initcall_blacklist` is harmless to it and the
