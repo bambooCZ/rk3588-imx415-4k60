@@ -20,6 +20,20 @@ no kernel rebuild.
    - **add** `initcall_blacklist=rkcif_clr_unready_dev,rkisp_clr_unready_dev` to the
      `extraargs=` line (create the line if there is none).
 
+   For example (keep your own `rootdev`, `fdtfile` and other lines as they are):
+
+   ```
+   verbosity=1
+   bootlogo=false
+   console=both
+   extraargs=cma=256M initcall_blacklist=rkcif_clr_unready_dev,rkisp_clr_unready_dev
+   overlay_prefix=rockchip-rk3588
+   fdtfile=rockchip/rk3588-rock-5b.dtb
+   rootdev=UUID=<your root filesystem UUID>
+   rootfstype=ext4
+   user_overlays=rock-5b-radxa-camera-4k-60fps
+   ```
+
 3. Reboot.
 
 Needs Armbian's `vendor-rk35xx` kernel before Armbian 26.11. Other systems:
