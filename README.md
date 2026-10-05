@@ -40,6 +40,40 @@ no kernel rebuild.
 Needs Armbian's `vendor-rk35xx` kernel before Armbian 26.11. Other systems:
 [build it yourself](#2-steps).
 
+### Try it with GStreamer
+
+Installing rkaiq and GStreamer with Rockchip's MPP plugin on Armbian is out of scope
+here. What this was tested with:
+
+- [rkaiq 2026_09_08](https://github.com/JeffyCN/mirrors/archive/refs/tags/rkaiq-2026_09_08.zip)
+  (Rockchip's 3A server; without it the picture is raw and unbalanced)
+- [the IQ file from Radxa OS](https://gist.github.com/bambooCZ/8053179a154b463e2d93d5a02252c42b),
+  in `/etc/iqfiles/` — **keep its name**, `imx415_RADXA-CAMERA-4K_DEFAULT.json`:
+
+  ```sh
+  sudo wget -P /etc/iqfiles "https://gist.githubusercontent.com/bambooCZ/8053179a154b463e2d93d5a02252c42b/raw/imx415_RADXA-CAMERA-4K_DEFAULT.json"
+  ```
+
+- [gstreamer-rockchip](https://github.com/JeffyCN/mirrors/tree/gstreamer-rockchip) with
+  [PR#85](https://github.com/JeffyCN/mirrors/pull/85): the encoder asks for enough
+  capture buffers; without it rkisp dropped ~15 % of frames at 60 fps.
+
+```sh
+# the ISP main path node, e.g. /dev/video11
+v4l2-ctl --list-devices | grep -A1 rkisp_mainpath
+
+gst-launch-1.0 -e \
+  v4l2src device=/dev/video11 io-mode=dmabuf \
+  ! video/x-raw,format=NV12,width=3840,height=2160,framerate=60/1 \
+  ! queue max-size-buffers=2 max-size-bytes=0 max-size-time=0 \
+  ! mpph265enc rc-mode=cbr bps=35000000 gop=60 max-pending=4 \
+  ! h265parse ! matroskamux ! filesink location=4k60.mkv
+```
+
+Stop it with Ctrl+C. For 1080p60 change only `width=1920,height=1080` (the ISP scales)
+and lower `bps`. Only if an element with `video/x-raw(memory:DMABuf)` caps feeds the
+encoder do you also need [PR#84](https://github.com/JeffyCN/mirrors/pull/84).
+
 ## Switching between 30 and 60 fps
 
 The overlay decides, and nothing else does. Change it in `/boot/armbianEnv.txt` and
