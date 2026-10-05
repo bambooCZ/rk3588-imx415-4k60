@@ -101,6 +101,9 @@ case"): `rkisp_unite` and its IOMMU on, `rkisp0` and its IOMMU off, `rkisp0_vir0
 RKMPP H.265 tops out at ~83–87 fps at 4K, with the ISP dropping a few frames per second
 throughout; `max-pending` 4, 6 or 8 makes no consistent difference. Encode a smaller ISP output instead: 1440p90 has headroom.
 
+Next boss: overclocking the encoder 🙂 — its core runs at 800 MHz, the highest point in
+`venc_opp_table`; ~10 % more would cover 4K90.
+
 ## Diagnostics in the patch
 
 Module parameters in `/sys/module/imx415_60fps/parameters/`:
