@@ -64,14 +64,21 @@ v4l2-ctl --list-devices | grep -A1 rkisp_mainpath
 
 gst-launch-1.0 -e \
   v4l2src device=/dev/video11 io-mode=dmabuf \
-  ! video/x-raw,format=NV12,width=3840,height=2160,framerate=60/1 \
+  ! video/x-raw,format=UYVY,width=3840,height=2160,framerate=60/1 \
   ! queue max-size-buffers=2 max-size-bytes=0 max-size-time=0 \
   ! mpph265enc rc-mode=cbr bps=35000000 gop=60 max-pending=4 \
   ! h265parse ! matroskamux ! filesink location=4k60.mkv
 ```
 
 Stop it with Ctrl+C. For 1080p60 change only `width=1920,height=1080` (the ISP scales)
-and lower `bps`. Only if an element with `video/x-raw(memory:DMABuf)` caps feeds the
+and lower `bps`. Measured on the ROCK 5B (10 s each, 4K60 at 35 Mbit/s and 1080p60 at
+12 Mbit/s): 600 frames, every timestamp 16.67 ms apart, no two consecutive frames
+identical, 0 frames lost in the ISP.
+
+**Use `UYVY`, not `NV12`.** The ISP delivers NV12 as two planes in two dma-bufs, which
+mpph265enc cannot import: it copies every frame through RGA, and at 4K60 that loses
+~40 % of the frames in the ISP. `UYVY` is one plane, imported zero-copy, and the
+encoder converts 4:2:2 to 4:2:0 itself. Only if an element with `video/x-raw(memory:DMABuf)` caps feeds the
 encoder do you also need [PR#84](https://github.com/JeffyCN/mirrors/pull/84).
 
 ## Switching between 30 and 60 fps
