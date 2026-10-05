@@ -1,0 +1,50 @@
+// Radxa Camera 4K on both RK3588 ISPs ("unite": left and right halves of each line),
+// applied AFTER rock-5b-radxa-camera-4k-60fps. Same as Rockchip's
+// rk3588s-evb1-lp4x-v10-camera.dtsi "dual isp process image case": the unite node
+// replaces rkisp0 (same registers), and the virtual ISP the camera links to runs on it.
+/dts-v1/;
+/plugin/;
+
+/ {
+	metadata {
+		title = "Radxa Camera 4K on both ISPs (unite)";
+		compatible = "radxa,rock-5b";
+		category = "camera";
+		description = "Run the camera's ISP on rkisp_unite (both ISPs). Load after rock-5b-radxa-camera-4k-60fps.";
+	};
+
+	fragment@0 {
+		target = <&rkisp0>;
+		__overlay__ {
+			status = "disabled";
+		};
+	};
+
+	fragment@1 {
+		target = <&isp0_mmu>;
+		__overlay__ {
+			status = "disabled";
+		};
+	};
+
+	fragment@2 {
+		target = <&rkisp_unite>;
+		__overlay__ {
+			status = "okay";
+		};
+	};
+
+	fragment@3 {
+		target = <&rkisp_unite_mmu>;
+		__overlay__ {
+			status = "okay";
+		};
+	};
+
+	fragment@4 {
+		target = <&rkisp0_vir0>;
+		__overlay__ {
+			rockchip,hw = <&rkisp_unite>;
+		};
+	};
+};

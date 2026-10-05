@@ -1,0 +1,460 @@
+--- a/imx415.c
++++ b/imx415.c
+@@ -29,6 +29,16 @@
+  * 3. enum all supported mode mbus_code, not just cur_mode.
+  * V0.0X01.0X08
+  * 1. add dcphy param for hdrx2 mode.
++ *
++ * pitwall: out-of-tree copy for the 4K@60 linear mode
++ * 1. add 3864x2192 10bit linear 60fps 1485Mbps 4lane, first in the table,
++ *    so it is the default NO_HDR mode and the best fit for 3864x2192;
++ * 2. bind to "pitwall,imx415-60fps" under the driver name "imx415-60fps",
++ *    so it never competes with the built-in "sony,imx415" driver;
++ * 3. diagnostics: force_mode pins the mode table index, reg_override writes
++ *    registers at stream start, link_freq_idx reports another link frequency
++ *    (the D-PHY RX picks settle and calibration from it); a linear 4K mode at a
++ *    real 1782 Mbps sits last in the 4-lane table for link tests.
+  */
+ 
+ #define DEBUG
+@@ -687,6 +697,175 @@
+ 	{REG_NULL, 0x00},
+ };
+ 
++/*
++ * The 891M linear table at the 1485 Mbps lane rate: HMAX 0x0210 and VMAX 0x0928
++ * (1H = 528 / 74.25 MHz = 7.111 us, x 2344 = 16.67 ms), and
++ * the lane-rate registers (SYS_MODE 0x3033, INCKSEL3 0x3118, INCKSEL6 0x400C,
++ * INCKSEL7 0x4074 and the D-PHY timings 0x4018..0x4028) taken from the 1485M
++ * HDR tables above, which agree with mainline's 1485 Mbps / 37.125 MHz clock
++ * params. A line of 3864 10-bit pixels on 4 lanes takes 6.5 us at 1485 Mbps.
++ * 1782 Mbps also runs at 60 fps but logs ~750 CSI-2 CRC errors/s on this
++ * camera; 1485 Mbps is clean once the receiver calibrates (see the mode).
++ */
++static __maybe_unused const struct regval imx415_linear_10bit_3864x2192_1485M_regs[] = {
++	{0x3020, 0x00},
++	{0x3021, 0x00},
++	{0x3022, 0x00},
++	{0x3024, 0x28},
++	{0x3025, 0x09},
++	{0x3028, 0x10},
++	{0x3029, 0x02},
++	{0x302C, 0x00},
++	{0x302D, 0x00},
++	{0x3033, 0x08},
++	{0x3050, 0x08},
++	{0x3051, 0x00},
++	{0x3054, 0x19},
++	{0x3058, 0x3E},
++	{0x3060, 0x25},
++	{0x3064, 0x4a},
++	{0x30CF, 0x00},
++	{0x3118, 0xA0},
++	{0x3260, 0x01},
++	{0x400C, 0x01},
++	{0x4018, 0xA7},
++	{0x401A, 0x57},
++	{0x401C, 0x5F},
++	{0x401E, 0x97},
++	{0x401F, 0x01},
++	{0x4020, 0x5F},
++	{0x4022, 0xAF},
++	{0x4024, 0x5F},
++	{0x4026, 0x9F},
++	{0x4028, 0x4F},
++	{0x4074, 0x00},
++	{REG_NULL, 0x00},
++};
++
++/*
++ * diagnostics: the 4K60 linear mode at a real 1782 Mbps (lane-rate registers from the
++ * 1782M HDR tables; 0.43 ms vblank). Only selected by force_mode, for link tests.
++ */
++static __maybe_unused const struct regval imx415_linear_10bit_3864x2192_1782M_regs[] = {
++	{0x3020, 0x00},
++	{0x3021, 0x00},
++	{0x3022, 0x00},
++	{0x3024, 0xCA},
++	{0x3025, 0x08},
++	{0x3028, 0x26},
++	{0x3029, 0x02},
++	{0x302C, 0x00},
++	{0x302D, 0x00},
++	{0x3033, 0x04},
++	{0x3050, 0x08},
++	{0x3051, 0x00},
++	{0x3054, 0x19},
++	{0x3058, 0x3E},
++	{0x3060, 0x25},
++	{0x3064, 0x4a},
++	{0x30CF, 0x00},
++	{0x3118, 0xC0},
++	{0x3260, 0x01},
++	{0x400C, 0x01},
++	{0x4018, 0xB7},
++	{0x401A, 0x67},
++	{0x401C, 0x6F},
++	{0x401E, 0xDF},
++	{0x401F, 0x01},
++	{0x4020, 0x6F},
++	{0x4022, 0xCF},
++	{0x4024, 0x6F},
++	{0x4026, 0xB7},
++	{0x4028, 0x5F},
++	{0x4074, 0x00},
++	{REG_NULL, 0x00},
++};
++
++/*
++ * diagnostics: 4K linear at 2376 Mbps, 90 fps timing (HMAX 0x16E, VMAX 0x8CA:
++ * 4.93 us x 2250 = 11.09 ms). Clock from mainline's 2376M/37.125M params, D-PHY
++ * timings from the 2376M 2-lane table. force_mode only.
++ */
++static __maybe_unused const struct regval imx415_linear_10bit_3864x2192_2376M_regs[] = {
++	{0x3020, 0x00},
++	{0x3021, 0x00},
++	{0x3022, 0x00},
++	{0x3024, 0xCA},
++	{0x3025, 0x08},
++	{0x3028, 0x6E},
++	{0x3029, 0x01},
++	{0x302C, 0x00},
++	{0x302D, 0x00},
++	{0x3033, 0x00},
++	{0x3050, 0x08},
++	{0x3051, 0x00},
++	{0x3054, 0x19},
++	{0x3058, 0x3E},
++	{0x3060, 0x25},
++	{0x3064, 0x4a},
++	{0x30CF, 0x00},
++	{0x3118, 0x00},
++	{0x3119, 0x01},
++	{0x3260, 0x01},
++	{0x400C, 0x01},
++	{0x4018, 0xE7},
++	{0x401A, 0x8F},
++	{0x401C, 0x8F},
++	{0x401E, 0x7F},
++	{0x401F, 0x02},
++	{0x4020, 0x97},
++	{0x4022, 0x0F},
++	{0x4023, 0x01},
++	{0x4024, 0x97},
++	{0x4026, 0xF7},
++	{0x4028, 0x7F},
++	{0x4074, 0x00},
++	{REG_NULL, 0x00},
++};
++
++/*
++ * 4K90 at 2376 Mbps: HMAX 0x160 (4.741 us; below 0x15E the sensor reads out
++ * garbage) x VMAX 0x927 (2343) = 11.108 ms = 90.03 fps, 151 lines = 0.72 ms of
++ * vblank (under rkcif's 1 ms online warning). Needs both ISPs (rkisp_unite).
++ * Experiment: first in the table.
++ */
++static __maybe_unused const struct regval imx415_linear_10bit_3864x2192_2376M_90fps_regs[] = {
++	{0x3020, 0x00},
++	{0x3021, 0x00},
++	{0x3022, 0x00},
++	{0x3024, 0x27},
++	{0x3025, 0x09},
++	{0x3028, 0x60},
++	{0x3029, 0x01},
++	{0x302C, 0x00},
++	{0x302D, 0x00},
++	{0x3033, 0x00},
++	{0x3050, 0x08},
++	{0x3051, 0x00},
++	{0x3054, 0x19},
++	{0x3058, 0x3E},
++	{0x3060, 0x25},
++	{0x3064, 0x4a},
++	{0x30CF, 0x00},
++	{0x3118, 0x00},
++	{0x3119, 0x01},
++	{0x3260, 0x01},
++	{0x400C, 0x01},
++	{0x4018, 0xE7},
++	{0x401A, 0x8F},
++	{0x401C, 0x8F},
++	{0x401E, 0x7F},
++	{0x401F, 0x02},
++	{0x4020, 0x97},
++	{0x4022, 0x0F},
++	{0x4023, 0x01},
++	{0x4024, 0x97},
++	{0x4026, 0xF7},
++	{0x4028, 0x7F},
++	{0x4074, 0x00},
++	{REG_NULL, 0x00},
++};
++
+ static __maybe_unused const struct regval imx415_linear_12bit_1932x1096_594M_regs[] = {
+ 	{0x3020, 0x01},
+ 	{0x3021, 0x01},
+@@ -1083,11 +1262,68 @@
+  * }
+  */
+ static const struct imx415_mode supported_modes[] = {
++	{
++		/* experiment: 4K90, 2376 Mbps, 0.72 ms vblank; needs rkisp_unite */
++		.bus_fmt = MEDIA_BUS_FMT_SGBRG10_1X10,
++		.width = 3864,
++		.height = 2192,
++		.max_fps = {
++			.numerator = 10000,
++			.denominator = 900000,
++		},
++		.exp_def = 0x0927 - 0x08,
++		.hts_def = 4506,
++		.vts_def = 0x0927,
++		.global_reg_list = imx415_global_10bit_3864x2192_regs,
++		.reg_list = imx415_linear_10bit_3864x2192_2376M_90fps_regs,
++		.hdr_mode = NO_HDR,
++		.mipi_freq_idx = 4,
++		.bpp = 10,
++		.vc[PAD0] = 0,
++		.xvclk = IMX415_XVCLK_FREQ_37M,
++	},
+ 	/*
+ 	 * frame rate = 1 / (Vtt * 1H) = 1 / (VMAX * 1H)
+ 	 * VMAX >= (PIX_VWIDTH / 2) + 46 = height + 46
+ 	 */
+ 	{
++		/*
++		 * The sensor sends 1485 Mbps, but the link is reported as 760 MHz
++		 * (1520 Mbps): the same RK3588 D-PHY hsfreq range (settle), and
++		 * above the 1500 Mbps line where its driver enables receiver
++		 * calibration. Without it every line fails CRC (~130k/s); with
++		 * it none do.
++		 *
++		 * The line is as short as the link allows (1H = 528 / 74.25 MHz
++		 * = 7.111 us for a 6.5 us line) so that VMAX 2344 leaves 152 lines
++		 * (1.08 ms) of vertical blanking at 60 fps. rkcif asks for >= 1 ms
++		 * with the ISP online; with HMAX 550 / VMAX 2250 (0.43 ms) the
++		 * driver repeated a buffer timestamp on ~5 % of frames (equal PTS,
++		 * then a 33 ms jump); with this timing none in 1800 frames.
++		 *
++		 * hts_def is the true line length at the reported pixel rate
++		 * (760M / 10 * 2 * 4 = 608 Mpix/s x 7.111 us = 4324), so rkaiq's
++		 * pixel_rate / (hts * vts) is 60 fps; vblank still lowers the rate.
++		 */
++		.bus_fmt = MEDIA_BUS_FMT_SGBRG10_1X10,
++		.width = 3864,
++		.height = 2192,
++		.max_fps = {
++			.numerator = 10000,
++			.denominator = 600000,
++		},
++		.exp_def = 0x0928 - 0x08,
++		.hts_def = 4324,
++		.vts_def = 0x0928,
++		.global_reg_list = imx415_global_10bit_3864x2192_regs,
++		.reg_list = imx415_linear_10bit_3864x2192_1485M_regs,
++		.hdr_mode = NO_HDR,
++		.mipi_freq_idx = 5,
++		.bpp = 10,
++		.vc[PAD0] = 0,
++		.xvclk = IMX415_XVCLK_FREQ_37M,
++	},
++	{
+ 		.bus_fmt = MEDIA_BUS_FMT_SGBRG10_1X10,
+ 		.width = 3864,
+ 		.height = 2192,
+@@ -1301,6 +1537,46 @@
+ 		.vc[PAD3] = 1,//M->csi wr2
+ 		.xvclk = IMX415_XVCLK_FREQ_37M,
+ 	},
++	{
++		/* diagnostics: 3864x2192 linear at a real 1782 Mbps; force_mode only */
++		.bus_fmt = MEDIA_BUS_FMT_SGBRG10_1X10,
++		.width = 3864,
++		.height = 2192,
++		.max_fps = {
++			.numerator = 10000,
++			.denominator = 600000,
++		},
++		.exp_def = 0x08ca - 0x08,
++		.hts_def = 5280,
++		.vts_def = 0x08ca,
++		.global_reg_list = imx415_global_10bit_3864x2192_regs,
++		.reg_list = imx415_linear_10bit_3864x2192_1782M_regs,
++		.hdr_mode = NO_HDR,
++		.mipi_freq_idx = 3,
++		.bpp = 10,
++		.vc[PAD0] = 0,
++		.xvclk = IMX415_XVCLK_FREQ_37M,
++	},
++	{
++		/* diagnostics: 3864x2192 linear at 2376 Mbps, 90 fps timing; force_mode only */
++		.bus_fmt = MEDIA_BUS_FMT_SGBRG10_1X10,
++		.width = 3864,
++		.height = 2192,
++		.max_fps = {
++			.numerator = 10000,
++			.denominator = 900000,
++		},
++		.exp_def = 0x08ca - 0x08,
++		.hts_def = 4685,
++		.vts_def = 0x08ca,
++		.global_reg_list = imx415_global_10bit_3864x2192_regs,
++		.reg_list = imx415_linear_10bit_3864x2192_2376M_regs,
++		.hdr_mode = NO_HDR,
++		.mipi_freq_idx = 4,
++		.bpp = 10,
++		.vc[PAD0] = 0,
++		.xvclk = IMX415_XVCLK_FREQ_37M,
++	},
+ };
+ 
+ static const struct imx415_mode supported_modes_2lane[] = {
+@@ -1352,6 +1628,9 @@
+ 	MIPI_FREQ_743M,
+ 	MIPI_FREQ_891M,
+ 	MIPI_FREQ_1188M,
++	760000000,	/* reported for the 1485 Mbps 60fps mode, see there */
++	950000000,	/* diagnostics (link_freq_idx): 1900 Mbps, settle range 0x37 */
++	1050000000,	/* diagnostics (link_freq_idx): 2100 Mbps, settle range 0x3c */
+ };
+ 
+ /* Write registers up to 4 at a time */
+@@ -1446,6 +1725,25 @@
+ 	       abs(mode->height - framefmt->height);
+ }
+ 
++/*
++ * Diagnostics: pin the mode table index, at probe and on every set_fmt, so any
++ * mode can be tried at runtime (write the parameter, then set the subdev format).
++ */
++static int force_mode = -1;
++module_param(force_mode, int, 0644);
++MODULE_PARM_DESC(force_mode, "diagnostics: mode table index used at probe and on every set_fmt (-1 = normal selection)");
++
++static int link_freq_idx = -1;
++module_param(link_freq_idx, int, 0644);
++MODULE_PARM_DESC(link_freq_idx, "diagnostics: link_freq_items index reported instead of the mode's, from the next set_fmt (-1 = the mode's)");
++
++static u32 imx415_link_idx(const struct imx415_mode *mode)
++{
++	if (link_freq_idx >= 0 && link_freq_idx < (int)ARRAY_SIZE(link_freq_items))
++		return link_freq_idx;
++	return mode->mipi_freq_idx;
++}
++
+ static const struct imx415_mode *
+ imx415_find_best_fit(struct imx415 *imx415, struct v4l2_subdev_format *fmt)
+ {
+@@ -1455,6 +1753,11 @@
+ 	int cur_best_fit_dist = -1;
+ 	unsigned int i;
+ 
++	if (force_mode >= 0 && force_mode < imx415->cfg_num) {
++		dev_info(&imx415->client->dev, "%s: force_mode(%d)", __func__, force_mode);
++		return &imx415->supported_modes[force_mode];
++	}
++
+ 	for (i = 0; i < imx415->cfg_num; i++) {
+ 		dist = imx415_get_reso_dist(&imx415->supported_modes[i], framefmt);
+ 		if ((cur_best_fit_dist == -1 || dist < cur_best_fit_dist) &&
+@@ -1520,14 +1823,14 @@
+ 					 IMX415_VTS_MAX - mode->height,
+ 					 1, vblank_def);
+ 		__v4l2_ctrl_s_ctrl(imx415->vblank, vblank_def);
+-		__v4l2_ctrl_s_ctrl(imx415->link_freq, mode->mipi_freq_idx);
+-		pixel_rate = (u32)link_freq_items[mode->mipi_freq_idx] /
++		__v4l2_ctrl_s_ctrl(imx415->link_freq, imx415_link_idx(mode));
++		pixel_rate = (u32)link_freq_items[imx415_link_idx(mode)] /
+ 			mode->bpp * 2 * lanes;
+ 		__v4l2_ctrl_s_ctrl_int64(imx415->pixel_rate,
+ 					 pixel_rate);
+ 	}
+-	dev_info(&imx415->client->dev, "%s: mode->mipi_freq_idx(%d)",
+-		 __func__, mode->mipi_freq_idx);
++	dev_info(&imx415->client->dev, "%s: mode->mipi_freq_idx(%d) reported(%u)",
++		 __func__, mode->mipi_freq_idx, imx415_link_idx(mode));
+ 
+ 	mutex_unlock(&imx415->mutex);
+ 
+@@ -2241,8 +2544,8 @@
+ 			__v4l2_ctrl_modify_range(imx415->vblank, h,
+ 				IMX415_VTS_MAX - mode->height,
+ 				1, h);
+-			__v4l2_ctrl_s_ctrl(imx415->link_freq, mode->mipi_freq_idx);
+-			pixel_rate = (u32)link_freq_items[mode->mipi_freq_idx] /
++			__v4l2_ctrl_s_ctrl(imx415->link_freq, imx415_link_idx(mode));
++			pixel_rate = (u32)link_freq_items[imx415_link_idx(mode)] /
+ 				mode->bpp * 2 * lanes;
+ 			__v4l2_ctrl_s_ctrl_int64(imx415->pixel_rate,
+ 						 pixel_rate);
+@@ -2484,9 +2787,19 @@
+ }
+ #endif
+ 
++/*
++ * Diagnostics: register writes applied after the mode table and the controls,
++ * right before streaming starts. Each entry is (register << 8) | value; an entry
++ * with register 0 is skipped, so writing "0" clears the list.
++ */
++static unsigned int reg_override[32];
++static int reg_override_num;
++module_param_array(reg_override, uint, &reg_override_num, 0644);
++MODULE_PARM_DESC(reg_override, "diagnostics: (reg << 8 | val) writes applied at stream start");
++
+ static int __imx415_start_stream(struct imx415 *imx415)
+ {
+-	int ret;
++	int ret, i;
+ 
+ 	if (!imx415->is_thunderboot) {
+ 		ret = imx415_write_array(imx415->client, imx415->cur_mode->global_reg_list);
+@@ -2513,6 +2826,16 @@
+ 			return ret;
+ 		}
+ 	}
++	for (i = 0; i < reg_override_num; i++) {
++		u32 reg = reg_override[i] >> 8, val = reg_override[i] & 0xff;
++
++		if (!reg)
++			continue;
++		dev_info(&imx415->client->dev, "reg_override 0x%04x = 0x%02x\n", reg, val);
++		ret = imx415_write_reg(imx415->client, reg, IMX415_REG_VALUE_08BIT, val);
++		if (ret)
++			return ret;
++	}
+ 	return imx415_write_reg(imx415->client, IMX415_REG_CTRL_MODE,
+ 				IMX415_REG_VALUE_08BIT, 0);
+ }
+@@ -3231,6 +3554,8 @@
+ 			break;
+ 		}
+ 	}
++	if (force_mode >= 0 && force_mode < imx415->cfg_num)
++		imx415->cur_mode = &imx415->supported_modes[force_mode];
+ 
+ 	of_property_read_u32(node, RKMODULE_CAMERA_FASTBOOT_ENABLE,
+ 		&imx415->is_thunderboot);
+@@ -3364,20 +3689,20 @@
+ 
+ #if IS_ENABLED(CONFIG_OF)
+ static const struct of_device_id imx415_of_match[] = {
+-	{ .compatible = "sony,imx415" },
++	{ .compatible = "pitwall,imx415-60fps" },
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, imx415_of_match);
+ #endif
+ 
+ static const struct i2c_device_id imx415_match_id[] = {
+-	{ "sony,imx415", 0 },
++	{ "imx415-60fps", 0 },
+ 	{ },
+ };
+ 
+ static struct i2c_driver imx415_i2c_driver = {
+ 	.driver = {
+-		.name = IMX415_NAME,
++		.name = "imx415-60fps",
+ 		.pm = &imx415_pm_ops,
+ 		.of_match_table = of_match_ptr(imx415_of_match),
+ 	},

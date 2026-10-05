@@ -71,6 +71,8 @@ gst-launch-1.0 -e \
 
 Stop it with Ctrl+C. For 1080p60 set `width=1920,height=1080` and a lower `bps`.
 
+Experiment: [4K90](4k90/) — both ISPs, 2376 Mbps link, 1440p90 encoded.
+
 ## 30 or 60 fps
 
 The overlay sets the rate; change it in `/boot/armbianEnv.txt` and reboot:
