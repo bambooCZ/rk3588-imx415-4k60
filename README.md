@@ -55,8 +55,10 @@ here. What this was tested with:
   ```
 
 - [gstreamer-rockchip](https://github.com/JeffyCN/mirrors/tree/gstreamer-rockchip) with
-  [PR#85](https://github.com/JeffyCN/mirrors/pull/85): the encoder asks for enough
-  capture buffers; without it rkisp dropped ~15 % of frames at 60 fps.
+  [PR#84](https://github.com/JeffyCN/mirrors/pull/84) (the encoders accept
+  `video/x-raw(memory:DMABuf)`) and
+  [PR#85](https://github.com/JeffyCN/mirrors/pull/85) (the encoder asks for enough
+  capture buffers; without it rkisp dropped ~15 % of frames at 60 fps).
 
 ```sh
 # the ISP main path node, e.g. /dev/video11
@@ -78,8 +80,7 @@ identical, 0 frames lost in the ISP.
 **Use `UYVY`, not `NV12`.** The ISP delivers NV12 as two planes in two dma-bufs, which
 mpph265enc cannot import: it copies every frame through RGA, and at 4K60 that loses
 ~40 % of the frames in the ISP. `UYVY` is one plane, imported zero-copy, and the
-encoder converts 4:2:2 to 4:2:0 itself. Only if an element with `video/x-raw(memory:DMABuf)` caps feeds the
-encoder do you also need [PR#84](https://github.com/JeffyCN/mirrors/pull/84).
+encoder converts 4:2:2 to 4:2:0 itself.
 
 ## Switching between 30 and 60 fps
 
