@@ -110,8 +110,6 @@ Requirements:
 - an initramfs built by `initramfs-tools` or `mkinitcpio`.
 
 ```sh
-git clone https://github.com/bambooCZ/rk3588-imx415-4k60.git
-cd rk3588-imx415-4k60
 make                 # builds imx415_60fps.ko, derives the overlay
 make check           # vermagic, binding, struct module vs. your kernel
 sudo make install    # module, overlay, initramfs
